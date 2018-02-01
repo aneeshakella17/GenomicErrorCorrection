@@ -13,7 +13,7 @@ compliment = {'A': 'T', 'C': 'G', 'G': 'C', 'T': 'A', 'N':'N'};
 reverse_dictionary = {'+': '-', '-':'+'}
 
 def get_tbx_array(str):
-    case = {'t1': 'tests/t1/', 't2': 'tests/t2/', 't3': 'tests/t3/', 't4': 'tests/t4/', 't5': 'tests/t5/', 't6': 'tests/t6'};
+    case = {'t1': 'tests/t1/', 't2': 'tests/t2/', 't3': 'tests/t3/', 't4': 'tests/t4/', 't5': 'tests/t5/', 't6': 'tests/t6', 't7': 'tests/t7'};
     file_extension = case[str];
     fast = open(file_extension + 'test.fasta');
     test_unit = file_extension + 'test.unit.bed.gz';
@@ -122,23 +122,26 @@ def fix_orientation(head, fasta):
     while contig is not None and contig.next is not None:
         edge_orientation = {"++": 0, "--":0, "+-":0, "-+":0};
         for edge in contig.edges:
-            if(edge.getEndContig().getName() == contig.next.getName()):
+            # if(edge.getEndContig().getName() == contig.next.getName()):
                 edge_orientation = edge.getOrientation();
-                break;
+                # break;
 
         rr = edge_orientation["--"];
         ff = edge_orientation["++"];
         fr = edge_orientation["+-"]
 
+        changes = [];
         if(rr > fr or ff > fr):
 
             if(rr > fr):
-                print(contig.getName())
+                # print(contig.getName())
                 fasta = reverse_compliment(contig, fasta);
             elif(ff > fr):
                 contig = contig.next;
-                print(contig.getName())
+                # print(contig.getName())
                 fasta = reverse_compliment(contig, fasta);
+
+            changes.append(contig.getName());
 
             for read in contig.reads:
                 read.changeOrientation(read.getOrientation()[1], read.getOrientation()[0]);
@@ -188,7 +191,7 @@ def fix_orientation(head, fasta):
 
         contig = contig.next;
 
-    return fasta;
+    return fasta, changes;
 
 
 
@@ -400,17 +403,20 @@ def switch_contig(contig1, contig2, head, fasta):
 
 
 def main():
-    tbx_array = get_tbx_array('t5');
+    string = "t5"
+    tbx_array = get_tbx_array(string);
     count = 0;
     before_cross = False;
 
+    changes_array = [];
+    fasta_array = [];
+
     for entry in tbx_array:
-        fast, test_unit = getFiles('t5');
+        fast, test_unit = getFiles(string);
         new_fast = pre_process_fasta(fast);
         head_contig = Contig.create_contigs(test_unit);
         insert_all_reads(head_contig, entry, new_fast);
-        new_fast = fix_orientation(head_contig, new_fast);
-
+        fasta, changes = fix_orientation(head_contig, new_fast);
         contig_parts, isThereCross = crossover_detection(head_contig);
 
         if(isThereCross or before_cross):
@@ -418,8 +424,9 @@ def main():
                 contig1, contig2 = contig_parts[0], contig_parts[1];
                 print(contig1.getName(), contig2.getName())
                 contig1_copy, contig2_copy = copy.copy(contig1), copy.copy(contig2);
-                fasta = switch_contig(contig1, contig2, head_contig, new_fast);
+                fasta = switch_contig(contig1, contig2, head_contig, fasta);
                 before_cross = True;
+
             else:
                 contig = head_contig;
                 while contig is not None:
@@ -429,14 +436,20 @@ def main():
                         contig2 = contig;
                     contig = contig.next;
 
-                fasta = switch_contig(contig1, contig2, head_contig, new_fast)
+                fasta = switch_contig(contig1, contig2, head_contig, fasta);
+
+            changes.append(contig1.getName() + ',' + contig2.getName());
+
+        fasta_array.append(fasta)
+        changes_array.append(changes)
 
 
+    best_index = changes_array.index(max(changes_array, key = lambda x : len(x)));
 
-        write_fasta(fasta, str(count));
-        count += 1;
+    for i in range(0, len(fasta_array)):
+        write_fasta(fasta_array[best_index], str(i));
 
-        break;
+
 
 
 if __name__ == "__main__": main()
