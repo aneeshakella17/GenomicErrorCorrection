@@ -128,7 +128,8 @@ def fix_orientation(head, fasta):
 
     while contig is not None and contig.next is not None:
         edge_orientation = {"++": 0, "--":0, "+-":0, "-+":0};
-        for edge in contig.edges:
+        edges = contig.edges;
+        for edge in edges:
             edge_orientation = edge.getOrientation();
 
             rr = edge_orientation["--"];
@@ -137,13 +138,16 @@ def fix_orientation(head, fasta):
 
             if(rr > fr or ff > fr):
 
+
                 if(rr > fr):
                     fasta = reverse_compliment(contig, fasta);
                 elif(ff > fr):
-                    contig = contig.next;
+                    contig = edge.sink;
                     fasta = reverse_compliment(contig, fasta);
 
+
                 changes.append(contig.getName());
+
 
                 for read in contig.reads:
                     read.changeOrientation(read.getOrientation()[1], read.getOrientation()[0]);
@@ -159,36 +163,39 @@ def fix_orientation(head, fasta):
                     read.changeStart2Seq(contig.getStart() + start)
                     read.changeEnd2Seq(contig.getStart() + end);
 
+                #
+                #
+                # prev_contig = contig.prev;
+                #
+                # if(prev_contig is not None):
+                #     for edge in prev_contig.edges:
+                #         for read in edge.reads:
+                #             if(read.getEndContig().getName() == contig.getName()):
+                #                 if(read.getOrientation()[1] == "+"):
+                #
+                #                     read.changeOrientation(read.getOrientation()[0], "-");
+                #                     start_distance = contig.getEnd() - read.getStart2();
+                #                     end_distance = contig.getEnd() - read.getEnd2();
+                #
+                #                     read.changeStart2Seq(contig.getStart() + start_distance)
+                #                     read.changeEnd2Seq(contig.getStart() + end_distance)
+                #
+                #
+                # #
 
 
-                prev_contig = contig.prev;
+                # for edge in contig.edges:
+                #     for read in edge.reads:
+                #         if(read.getOrientation()[0] == "-"):
+                #
+                #             read.changeOrientation("+", read.getOrientation()[1])
+                #             start_distance = contig.getEnd() - read.getStart1();
+                #             end_distance = contig.getEnd() - read.getEnd1();
+                #
+                #             read.changeStart1Seq(contig.getStart() + start_distance);
+                #             read.changeEnd1Seq(contig.getStart() + end_distance);
 
-                if(prev_contig is not None):
-                    for edge in prev_contig.edges:
-                        for read in edge.reads:
-                            if(read.getEndContig().getName() == contig.getName()):
-                                if(read.getOrientation()[1] == "+"):
-
-                                    read.changeOrientation(read.getOrientation()[0], "-");
-                                    start_distance = contig.getEnd() - read.getStart2();
-                                    end_distance = contig.getEnd() - read.getEnd2();
-
-                                    read.changeStart2Seq(contig.getStart() + start_distance)
-                                    read.changeEnd2Seq(contig.getStart() + end_distance)
-
-
-
-                for edge in contig.edges:
-                    for read in edge.reads:
-                        if(read.getOrientation()[0] == "-"):
-
-                            read.changeOrientation("+", read.getOrientation()[1])
-                            start_distance = contig.getEnd() - read.getStart1();
-                            end_distance = contig.getEnd() - read.getEnd1();
-
-                            read.changeStart1Seq(contig.getStart() + start_distance);
-                            read.changeEnd1Seq(contig.getStart() + end_distance);
-
+                contig = edge.source;
 
 
         contig = contig.next;
@@ -292,7 +299,7 @@ def printOrient(head):
 
 def write_fasta(fasta, entry):
     f = open("output" + entry + ".fasta", "w");
-    chr = "chr1";
+    chr = "chr4";
     f.write(">" + chr + "\n");
     for i in range(0, len(fasta), 60):
         if(len(fasta) - i < 60):
@@ -308,16 +315,15 @@ def crossover_detection(head):
     greatest_connect = float('-inf');
 
     while contig is not None:
-        greatest_connect = float('-inf');
         for edge in contig.edges:
                 if(edge.sink.getName() == contig.next.getName()):
                     break;
                 else:
-                    return [contig.next, edge.sink], True;
+                    potential_flips.append([contig.next, edge.sink]);
 
         contig = contig.next;
 
-    return [], False;
+    return [];
 
 
 def switch_contig(contig1, contig2, head, fasta):
@@ -402,7 +408,7 @@ def switch_contig(contig1, contig2, head, fasta):
 
 
 def main():
-    string = "t6"
+    string = "t7"
     tbx_array = get_tbx_array(string);
     count = 0;
     before_cross = False;
@@ -416,14 +422,13 @@ def main():
         head_contig = Contig.create_contigs(test_unit);
         insert_all_reads(head_contig, entry, new_fast);
         fasta, changes = fix_orientation(head_contig, new_fast);
-        contig_parts, isThereCross = crossover_detection(head_contig);
+        contig_parts = crossover_detection(head_contig);
 
-        if(isThereCross or before_cross):
+        if(len(contig_parts) > 0 or before_cross):
             if not before_cross:
-                contig1, contig2 = contig_parts[0], contig_parts[1];
-                print(contig1.getName(), contig2.getName())
-                contig1_copy, contig2_copy = copy.copy(contig1), copy.copy(contig2);
-                fasta = switch_contig(contig1, contig2, head_contig, fasta);
+                for contig_part in contig_parts:
+                    contig1, contig2 = contig_part[0], contig_part[1];
+                    fasta = switch_contig(contig1, contig2, head_contig, fasta);
                 before_cross = True;
 
             else:
