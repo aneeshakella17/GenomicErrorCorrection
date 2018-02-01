@@ -13,7 +13,7 @@ compliment = {'A': 'T', 'C': 'G', 'G': 'C', 'T': 'A', 'N':'N'};
 reverse_dictionary = {'+': '-', '-':'+'}
 
 def get_tbx_array(str):
-    case = {'t1': 'tests/t1/', 't2': 'tests/t2/', 't3': 'tests/t3/', 't4': 'tests/t4/', 't5': 'tests/t5/', 't6': 'tests/t6', 't7': 'tests/t7'};
+    case = {'t1': 'tests/t1/', 't2': 'tests/t2/', 't3': 'tests/t3/', 't4': 'tests/t4/', 't5': 'tests/t5/', 't6': 'tests/t6/', 't7': 'tests/t7/'};
     file_extension = case[str];
     fast = open(file_extension + 'test.fasta');
     test_unit = file_extension + 'test.unit.bed.gz';
@@ -36,7 +36,7 @@ def get_tbx_array(str):
 
 
 def getFiles(str):
-    case = {'t1': 'tests/t1/', 't2': 'tests/t2/', 't3': 'tests/t3/', 't4': 'tests/t4/', 't5': 'tests/t5/'};
+    case = {'t1': 'tests/t1/', 't2': 'tests/t2/', 't3': 'tests/t3/', 't4': 'tests/t4/', 't5': 'tests/t5/', 't6': 'tests/t6/', 't7': 'tests/t7/'};
 
     file_extension = case[str];
 
@@ -55,7 +55,7 @@ def pre_process_fasta(fast):
     ret = sequence[i + 1:].replace('\n','');
     return ret;
 
-def insert_all_reads(head, tbx, fasta):
+def insert_all_reads(head, tbx, fasta, epsilon = 1):
     contig = head;
 
     total_rows = [];
@@ -63,6 +63,12 @@ def insert_all_reads(head, tbx, fasta):
 
     for row in tbx.fetch():
             new_row = row.split('\t');
+
+            quality = int(new_row[7]);
+            if(epsilon > quality):
+                continue;
+
+
             first_position = int(new_row[1]);
             second_position = int(new_row[2]);
             third_position = int(new_row[4]);
@@ -118,74 +124,70 @@ def insert_all_reads(head, tbx, fasta):
 
 def fix_orientation(head, fasta):
     contig = head;
+    changes = [];
 
     while contig is not None and contig.next is not None:
         edge_orientation = {"++": 0, "--":0, "+-":0, "-+":0};
         for edge in contig.edges:
-            # if(edge.getEndContig().getName() == contig.next.getName()):
-                edge_orientation = edge.getOrientation();
-                # break;
+            edge_orientation = edge.getOrientation();
 
-        rr = edge_orientation["--"];
-        ff = edge_orientation["++"];
-        fr = edge_orientation["+-"]
+            rr = edge_orientation["--"];
+            ff = edge_orientation["++"];
+            fr = edge_orientation["+-"]
 
-        changes = [];
-        if(rr > fr or ff > fr):
+            if(rr > fr or ff > fr):
 
-            if(rr > fr):
-                # print(contig.getName())
-                fasta = reverse_compliment(contig, fasta);
-            elif(ff > fr):
-                contig = contig.next;
-                # print(contig.getName())
-                fasta = reverse_compliment(contig, fasta);
+                if(rr > fr):
+                    fasta = reverse_compliment(contig, fasta);
+                elif(ff > fr):
+                    contig = contig.next;
+                    fasta = reverse_compliment(contig, fasta);
 
-            changes.append(contig.getName());
+                changes.append(contig.getName());
 
-            for read in contig.reads:
-                read.changeOrientation(read.getOrientation()[1], read.getOrientation()[0]);
+                for read in contig.reads:
+                    read.changeOrientation(read.getOrientation()[1], read.getOrientation()[0]);
 
-                start= contig.getEnd() - read.getStart1();
-                start2 = contig.getEnd() - read.getStart2();
-                end = contig.getEnd() - read.getEnd1();
-                end2 = contig.getEnd() - read.getEnd2();
+                    start= contig.getEnd() - read.getStart1();
+                    start2 = contig.getEnd() - read.getStart2();
+                    end = contig.getEnd() - read.getEnd1();
+                    end2 = contig.getEnd() - read.getEnd2();
 
 
-                read.changeStart1Seq(contig.getStart() + start2);
-                read.changeEnd1Seq(contig.getStart() + end2);
-                read.changeStart2Seq(contig.getStart() + start)
-                read.changeEnd2Seq(contig.getStart() + end);
+                    read.changeStart1Seq(contig.getStart() + start2);
+                    read.changeEnd1Seq(contig.getStart() + end2);
+                    read.changeStart2Seq(contig.getStart() + start)
+                    read.changeEnd2Seq(contig.getStart() + end);
 
 
 
-            prev_contig = contig.prev;
+                prev_contig = contig.prev;
 
-            if(prev_contig is not None):
-                for edge in prev_contig.edges:
+                if(prev_contig is not None):
+                    for edge in prev_contig.edges:
+                        for read in edge.reads:
+                            if(read.getEndContig().getName() == contig.getName()):
+                                if(read.getOrientation()[1] == "+"):
+
+                                    read.changeOrientation(read.getOrientation()[0], "-");
+                                    start_distance = contig.getEnd() - read.getStart2();
+                                    end_distance = contig.getEnd() - read.getEnd2();
+
+                                    read.changeStart2Seq(contig.getStart() + start_distance)
+                                    read.changeEnd2Seq(contig.getStart() + end_distance)
+
+
+
+                for edge in contig.edges:
                     for read in edge.reads:
-                        if(read.getEndContig().getName() == contig.getName()):
-                            if(read.getOrientation()[1] == "+"):
+                        if(read.getOrientation()[0] == "-"):
 
-                                read.changeOrientation(read.getOrientation()[0], "-");
-                                start_distance = contig.getEnd() - read.getStart2();
-                                end_distance = contig.getEnd() - read.getEnd2();
+                            read.changeOrientation("+", read.getOrientation()[1])
+                            start_distance = contig.getEnd() - read.getStart1();
+                            end_distance = contig.getEnd() - read.getEnd1();
 
-                                read.changeStart2Seq(contig.getStart() + start_distance)
-                                read.changeEnd2Seq(contig.getStart() + end_distance)
-
-
-
-            for edge in contig.edges:
-                for read in edge.reads:
-                    if(read.getOrientation()[0] == "-"):
-
-                        read.changeOrientation("+", read.getOrientation()[1])
-                        start_distance = contig.getEnd() - read.getStart1();
-                        end_distance = contig.getEnd() - read.getEnd1();
-
-                        read.changeStart1Seq(contig.getStart() + start_distance);
-                        read.changeEnd1Seq(contig.getStart() + end_distance);
+                            read.changeStart1Seq(contig.getStart() + start_distance);
+                            read.changeEnd1Seq(contig.getStart() + end_distance);
 
 
 
@@ -399,11 +401,8 @@ def switch_contig(contig1, contig2, head, fasta):
     return new_fasta;
 
 
-
-
-
 def main():
-    string = "t5"
+    string = "t6"
     tbx_array = get_tbx_array(string);
     count = 0;
     before_cross = False;
@@ -440,9 +439,11 @@ def main():
 
             changes.append(contig1.getName() + ',' + contig2.getName());
 
+        write_fasta(fasta, str(count));
+        count += 1;
         fasta_array.append(fasta)
         changes_array.append(changes)
-
+        print(changes)
 
     best_index = changes_array.index(max(changes_array, key = lambda x : len(x)));
 
