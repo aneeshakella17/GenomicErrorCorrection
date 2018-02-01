@@ -1,0 +1,33 @@
+ 538  ls *.bedpe
+  539  gzip -dc test.reads40kb.vcf.gz | less 
+  540  mv test.reads40kb.vcf.gz test.reads40kb.bedpe.gz
+  541  ls
+  542  gunzip test.reads40kb.bedpe.gz 
+  543  ls
+  544  less test.reads40kb.bedpe 
+  545  sort -k1,1 -k2,2n -k5,5n test.reads40kb.bedpe >tmp && mv tmp test.reads40kb.bedpe 
+  546  ls
+  547  less test.reads40kb.bedpe 
+  548  bgzip test.reads40kb.bedpe 
+  549  ls
+  550  tabix -h
+  551  tabix tabix -0 -s 1 -b 2 -e 5 test.reads40kb.bedpe.gz 
+  552  tabix -0 -s 1 -b 2 -e 5 test.reads40kb.bedpe.gz 
+  553  gzip -dc test.reads40kb.bedpe.gz | awk '{if ($1 != "." && $4 1= ".") { print }}' >tmp
+  554  gzip -dc test.reads40kb.bedpe.gz | awk '{if ($1 != "." && $4 != ".") { print }}' >tmp
+  555  less tmp 
+  556  mv tmp test.reads40kb.bedpe
+  557  bgzip test.reads40kb.bedpe
+  558  ls
+  559  tabix -0 -s 1 -b 2 -e 5 test.reads40kb.bedpe.gz 
+  560  history | less 
+  561  tabix -0 -s 1 -b 2 -e 6 test.reads40kb.bedpe.gz 
+  562  tabix -f -0 -s 1 -b 2 -e 6 test.reads40kb.bedpe.gz 
+  563  ls
+  564  ll
+  565  awk '{if ($1 != "." && $4 != ".") { print }}' test.reads10kb.bedpe | sort -k1,1 -k2,2n -k5,5n >tmp && mv tmp test.reads10kb.bedpe && tabix -f -0 -s 1 -b 2 -e 6 test.reads10kb.bedpe.gz
+  566  ls
+  567  bgzip test.reads10kb.bedpe 
+  568  tabix -f -0 -s 1 -b 2 -e 6 test.reads10kb.bedpe.gz 
+  569  ls
+  570  history | less 

@@ -1,0 +1,11 @@
+/Users/mac/PycharmProjects/ErrorCorrectionGenomeAssembly/truth.fasta /Users/mac/PycharmProjects/ErrorCorrectionGenomeAssembly/tests/t3/test.fasta
+NUCMER
+>chr1 chr1 1000000 982713
+1 119827 1 119827 0 0 0
+0
+126513 129512 168028 171027 0 0 0
+0
+138015 186014 119928 167927 0 0 0
+0
+188415 1000000 171128 982713 0 0 0
+0
