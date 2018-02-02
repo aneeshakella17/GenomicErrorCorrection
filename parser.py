@@ -323,7 +323,7 @@ def crossover_detection(head):
 
         contig = contig.next;
 
-    return [];
+    return potential_flips;
 
 
 def switch_contig(contig1, contig2, head, fasta):
@@ -412,10 +412,10 @@ def main():
     tbx_array = get_tbx_array(string);
     count = 0;
     before_cross = False;
-
     changes_array = [];
     fasta_array = [];
 
+    old_contig_parts = [];
     for entry in tbx_array:
         fast, test_unit = getFiles(string);
         new_fast = pre_process_fasta(fast);
@@ -423,26 +423,28 @@ def main():
         insert_all_reads(head_contig, entry, new_fast);
         fasta, changes = fix_orientation(head_contig, new_fast);
         contig_parts = crossover_detection(head_contig);
-
+        print(len(contig_parts))
         if(len(contig_parts) > 0 or before_cross):
-            if not before_cross:
+            if not before_cross or len(contig_parts) > len(old_contig_parts):
                 for contig_part in contig_parts:
                     contig1, contig2 = contig_part[0], contig_part[1];
                     fasta = switch_contig(contig1, contig2, head_contig, fasta);
+                    changes.append(contig1.getName() + ',' + contig2.getName());
                 before_cross = True;
-
+                old_contig_parts = contig_parts;
             else:
-                contig = head_contig;
-                while contig is not None:
-                    if(contig1.getName() == contig.getName()):
-                        contig1 = contig;
-                    elif(contig2.getName() == contig.getName()):
-                        contig2 = contig;
-                    contig = contig.next;
+                for contig_part in old_contig_parts:
+                    contig1, contig2 = contig_part[0], contig_part[1];
+                    contig = head_contig;
+                    while contig is not None:
+                        if(contig1.getName() == contig.getName()):
+                            contig1 = contig;
+                        elif(contig2.getName() == contig.getName()):
+                            contig2 = contig;
+                        contig = contig.next;
+                    fasta = switch_contig(contig1, contig2, head_contig, fasta);
+                    changes.append(contig1.getName() + ',' + contig2.getName());
 
-                fasta = switch_contig(contig1, contig2, head_contig, fasta);
-
-            changes.append(contig1.getName() + ',' + contig2.getName());
 
         write_fasta(fasta, str(count));
         count += 1;
