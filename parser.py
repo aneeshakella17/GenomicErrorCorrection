@@ -184,19 +184,19 @@ def fix_orientation(head, fasta):
                 # #
 
 
-                # for edge in contig.edges:
-                #     for read in edge.reads:
-                #         if(read.getOrientation()[0] == "-"):
-                #
-                #             read.changeOrientation("+", read.getOrientation()[1])
-                #             start_distance = contig.getEnd() - read.getStart1();
-                #             end_distance = contig.getEnd() - read.getEnd1();
-                #
-                #             read.changeStart1Seq(contig.getStart() + start_distance);
-                #             read.changeEnd1Seq(contig.getStart() + end_distance);
+                for edge in contig.edges:
+                    for read in edge.reads:
+                        if(read.getOrientation()[0] == "-"):
+
+                            read.changeOrientation("+", read.getOrientation()[1])
+                            start_distance = contig.getEnd() - read.getStart1();
+                            end_distance = contig.getEnd() - read.getEnd1();
+
+                            read.changeStart1Seq(contig.getStart() + start_distance);
+                            read.changeEnd1Seq(contig.getStart() + end_distance);
 
                 contig = edge.source;
-
+                break;
 
         contig = contig.next;
 
@@ -313,7 +313,7 @@ def crossover_detection(head):
     potential_flips = [];
     greatest_edge = None;
     greatest_connect = float('-inf');
-
+    #
     while contig is not None:
         for edge in contig.edges:
                 if(edge.sink.getName() == contig.next.getName()):
@@ -322,6 +322,79 @@ def crossover_detection(head):
                     potential_flips.append([contig.next, edge.sink]);
 
         contig = contig.next;
+
+    # while contig is not None:
+    #     for edge in contig.edges:
+    #         lst = [];
+    #         for read in edge.reads:
+    #             lst.append(abs(read.getStart1() - read.getEnd2()));
+    #         edge_mean = np.mean(lst)
+    #         print(edge.source.getName(), edge.sink.getName(), edge_mean);
+    #     contig = contig.next;
+    #
+    # lst1 = [];
+    # lst2 = [];
+    #
+    # total_lst = [];
+    #
+
+    #
+    # for flip in potential_flips:
+    #     contig1, contig2 = flip[0], flip[1]
+    #     main_contig = contig1.prev;
+    #
+    #     for edge in main_contig.edges:
+    #         first_contig = edge.source
+    #         second_contig = edge.sink
+    #
+    #         if(edge.sink.getName() == contig1.getName()):
+    #             for read in edge.reads:
+    #                 lst1.append(10000 - (abs(first_contig.getEnd() - read.getEnd1())) - (abs(second_contig.getStart() - read.getEnd2())));
+    #
+    #         if(edge.sink.getName() == contig2.getName()):
+    #             for read in edge.reads:
+    #                 lst2.append(10000 - (abs(first_contig.getEnd() - read.getEnd1())) - (abs(second_contig.getStart() - read.getEnd2())));
+    #
+
+
+    # contig = head
+    # while contig is not None:
+    #     for read in contig.reads:
+    #         total_lst.append(abs(read.getStart1() - read.getEnd2()));
+    #     contig = contig.next;
+    #
+    # lib_mean = np.mean(total_lst);
+    # lib_std = np.std(total_lst);
+    #
+    #
+    # for flip in potential_flips:
+    #     contig1, contig2 = flip[0], flip[1]
+    #     main_contig = contig1.prev;
+    #
+    #     for edge in main_contig.edges:
+    #         first_contig = edge.source
+    #         second_contig = edge.sink
+    #
+    #         if(edge.sink.getName() == contig1.getName()):
+    #             for read in edge.reads:
+    #                 lst1.append(lib_mean - (abs(first_contig.getEnd() - read.getStart1())) - (abs(second_contig.getStart() - read.getEnd2())));
+    #
+    #         if(edge.sink.getName() == contig2.getName()):
+    #             for read in edge.reads:
+    #                 lst2.append(abs(read.getEnd1() - read.getStart2()));
+    #
+    #
+    #
+    #     mean1 = 0;
+    #     mean2 = 0;
+    #     if(len(lst1) != 0):
+    #         mean1 = np.mean(lst1);
+    #     if(len(lst2) != 0):
+    #         mean2 = np.mean(lst2)
+    #
+    #     z1 = (mean1 - lib_mean)/(lib_std);
+    #     z2 = (mean2 - lib_mean)/((lib_std));
+    #     print(z1, z2)
 
     return potential_flips;
 
@@ -408,7 +481,7 @@ def switch_contig(contig1, contig2, head, fasta):
 
 
 def main():
-    string = "t7"
+    string = "t4"
     tbx_array = get_tbx_array(string);
     count = 0;
     before_cross = False;
