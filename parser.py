@@ -138,10 +138,11 @@ def fix_orientation(head, fasta):
 
             if(rr > fr or ff > fr):
 
-
+                prev_contig = None;
                 if(rr > fr):
                     fasta = reverse_compliment(contig, fasta);
                 elif(ff > fr):
+                    prev_contig = edge.source;
                     contig = edge.sink;
                     fasta = reverse_compliment(contig, fasta);
 
@@ -163,25 +164,21 @@ def fix_orientation(head, fasta):
                     read.changeStart2Seq(contig.getStart() + start)
                     read.changeEnd2Seq(contig.getStart() + end);
 
-                #
-                #
-                # prev_contig = contig.prev;
-                #
-                # if(prev_contig is not None):
-                #     for edge in prev_contig.edges:
-                #         for read in edge.reads:
-                #             if(read.getEndContig().getName() == contig.getName()):
-                #                 if(read.getOrientation()[1] == "+"):
-                #
-                #                     read.changeOrientation(read.getOrientation()[0], "-");
-                #                     start_distance = contig.getEnd() - read.getStart2();
-                #                     end_distance = contig.getEnd() - read.getEnd2();
-                #
-                #                     read.changeStart2Seq(contig.getStart() + start_distance)
-                #                     read.changeEnd2Seq(contig.getStart() + end_distance)
-                #
-                #
-                # #
+
+                if(prev_contig is not None):
+                    for edge in prev_contig.edges:
+                        for read in edge.reads:
+                            if(read.getEndContig().getName() == contig.getName()):
+                                if(read.getOrientation()[1] == "+"):
+                                    read.changeOrientation(read.getOrientation()[0], "-");
+                                    start_distance = contig.getEnd() - read.getStart2();
+                                    end_distance = contig.getEnd() - read.getEnd2();
+
+                                    read.changeStart2Seq(contig.getStart() + start_distance)
+                                    read.changeEnd2Seq(contig.getStart() + end_distance)
+
+
+
 
 
                 for edge in contig.edges:
@@ -286,6 +283,7 @@ def calc_orientation(head):
 def printOrient(head):
     calc_orientation(head);
     contig = head;
+
     while contig is not None:
         print(contig.getName())
         print(contig.orientation);
@@ -311,9 +309,7 @@ def write_fasta(fasta, entry):
 def crossover_detection(head):
     contig = head;
     potential_flips = [];
-    greatest_edge = None;
-    greatest_connect = float('-inf');
-    #
+
     while contig is not None:
         for edge in contig.edges:
                 if(edge.sink.getName() == contig.next.getName()):
@@ -323,6 +319,29 @@ def crossover_detection(head):
 
         contig = contig.next;
 
+
+
+    actual_flips = [];
+
+
+    for flip in potential_flips:
+        contig = head;
+        first_contig = flip[0];
+        second_contig = flip[1];
+
+        while contig is not None:
+            for edge in contig.edges:
+                if(first_contig.getName() == edge.getStartContig().getName()
+                   and second_contig.getName() == edge.getEndContig().getName()):
+                   actual_flips.append([first_contig, second_contig])
+
+            contig = contig.next;
+
+
+
+
+
+
     # while contig is not None:
     #     for edge in contig.edges:
     #         lst = [];
@@ -331,6 +350,7 @@ def crossover_detection(head):
     #         edge_mean = np.mean(lst)
     #         print(edge.source.getName(), edge.sink.getName(), edge_mean);
     #     contig = contig.next;
+
     #
     # lst1 = [];
     # lst2 = [];
@@ -355,7 +375,6 @@ def crossover_detection(head):
     #             for read in edge.reads:
     #                 lst2.append(10000 - (abs(first_contig.getEnd() - read.getEnd1())) - (abs(second_contig.getStart() - read.getEnd2())));
     #
-
 
     # contig = head
     # while contig is not None:
@@ -396,8 +415,7 @@ def crossover_detection(head):
     #     z2 = (mean2 - lib_mean)/((lib_std));
     #     print(z1, z2)
 
-    return potential_flips;
-
+    return actual_flips;
 
 def switch_contig(contig1, contig2, head, fasta):
 
@@ -420,7 +438,6 @@ def switch_contig(contig1, contig2, head, fasta):
 
 
     while(contig is not None):
-        # print(contig.getStart(), contig.getEnd());
         new_fasta += fasta[contig.getStart():contig.getEnd()];
         contig = contig.next;
 
@@ -481,7 +498,7 @@ def switch_contig(contig1, contig2, head, fasta):
 
 
 def main():
-    string = "t4"
+    string = "t7"
     tbx_array = get_tbx_array(string);
     count = 0;
     before_cross = False;
@@ -495,8 +512,9 @@ def main():
         head_contig = Contig.create_contigs(test_unit);
         insert_all_reads(head_contig, entry, new_fast);
         fasta, changes = fix_orientation(head_contig, new_fast);
+
         contig_parts = crossover_detection(head_contig);
-        print(len(contig_parts))
+
         if(len(contig_parts) > 0 or before_cross):
             if not before_cross or len(contig_parts) > len(old_contig_parts):
                 for contig_part in contig_parts:
