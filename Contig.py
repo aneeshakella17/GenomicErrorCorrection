@@ -6,17 +6,17 @@ head = None;
 
 class Contig(object):
 
-    def __init__(self, name, start, end, left):
+    def __init__(self, name, start, end, prev):
         self.name = name;
         self.start = start;
         self.end = end;
         self.reads = [];
         self.orientation = {"++": 0, "--":0, "+-":0, "-+":0};
-        self.prev = left;
         self.next = None;
         self.mean = 0 ;
         self.std = 0;
         self.edges = [];
+        self.prev = prev;
 
     def getName(self):
         return self.name;
@@ -95,6 +95,20 @@ def create_contigs(file):
         prev = new_contig;
 
     return head;
+
+def create_ordered_contigs(head_contig):
+
+
+    contigs = [];
+    contig = head_contig;
+
+    while contig is not None:
+        contigs.append(contig);
+        contig = contig.next;
+
+    contigs = sorted(contigs, key = lambda x:  -1 * abs(x.getStart() - x.getEnd()));
+
+    return contigs;
 
 
 def getHead():
