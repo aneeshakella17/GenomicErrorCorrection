@@ -120,14 +120,12 @@ def insert_all_reads(head, tbx, fasta, epsilon = 1):
 
             contig = contig.next;
 
-    calc_orientation(head);
 
 
-def fix_orientation(head, fasta):
-    contig = head;
+def fix_orientation(contigs, head_contig, fasta):
     changes = [];
 
-    while contig is not None and contig.next is not None:
+    for contig in contigs:
 
         for edge in contig.edges:
             edge_orientation = edge.getOrientation();
@@ -143,18 +141,19 @@ def fix_orientation(head, fasta):
 
                 if(rr > fr):
                     fasta = reverse_compliment(contig, fasta);
+                    changes.append(contig.getName());
                 elif(ff > fr):
-                    contig = edge.sink;
-                    fasta = reverse_compliment(contig, fasta);
+                    fasta = reverse_compliment(edge.getEndContig(), fasta);
+                    changes.append(edge.getEndContig().getName());
 
-                changes.append(contig.getName());
-                position_swap(head, contig);
 
-        contig = contig.next;
+                position_swap(contigs, head_contig, contig);
+
 
     return fasta, changes;
 
-def reformat_head(head_contig, changes):
+
+def reformat_head(contig_array, head_contig, changes):
 
     for change in changes:
         contig = head_contig;
@@ -162,7 +161,7 @@ def reformat_head(head_contig, changes):
         while(contig is not None):
 
             if(contig.getName() == change):
-                position_swap(head_contig, contig);
+                position_swap(contig_array, head_contig, contig);
                 break;
 
             contig = contig.next;
@@ -170,7 +169,7 @@ def reformat_head(head_contig, changes):
     return head_contig;
 
 
-def position_swap(head_contig, contig):
+def position_swap(contigs_array, head_contig, contig):
 
 
     for read in contig.reads:
@@ -186,11 +185,9 @@ def position_swap(head_contig, contig):
         read.changeStart2Seq(contig.getStart() + start)
         read.changeEnd2Seq(contig.getStart() + end);
 
-    tmp = head_contig;
 
 
-    while tmp is not None:
-
+    for tmp in contigs_array:
         for edge in tmp.edges:
             if (edge.getEndContig().getName() == contig.getName()):
                 for read in edge.reads:
@@ -204,7 +201,6 @@ def position_swap(head_contig, contig):
                     read.changeStart2Seq(contig.getStart() + start_distance)
                     read.changeEnd2Seq(contig.getStart() + end_distance)
 
-        tmp = tmp.next;
 
 
     for edge in contig.edges:
@@ -333,49 +329,43 @@ def write_fasta(fasta):
             f.write(fasta[i:i+60] + "\n");
 
 
-def crossover_detection(head):
-    contig = head;
+def crossover_detection(contig):
     potential_flips = [];
 
     while contig is not None:
         for edge in contig.edges:
-
-                if(edge.sink.getName() == contig.next.getName()):
-                    break;
-                else:
-                    potential_flips.append([contig.next, edge.sink]);
-
+            if(edge.sink.getName() == contig.next.getName()):
+                break;
+            else:
+                potential_flips.append([contig.next, edge.sink]);
         contig = contig.next;
 
 
-
-
+    # for flip in potential_flips:
+    #     contig = head;
+    #     first_contig = flip[0];
+    #     second_contig = flip[1];
+    #     print(first_contig.getName());
+    #     print(second_contig.getName());
+    #     print(' ')
     #
-    for flip in potential_flips:
-        contig = head;
-        first_contig = flip[0];
-        second_contig = flip[1];
-        print(first_contig.getName());
-        print(second_contig.getName());
-        print(' ')
-
-        while contig is not None:
-            for edge in contig.edges:
-                if (first_contig.getName() == edge.getStartContig().getName()):
-                    lst = [];
-                    lst2 = [];
-                    print(first_contig.getName(), edge.sink.getName())
-                    print(first_contig.getStart())
-                    print(first_contig.getEnd())
-                    print('BELOW IS MEAN')
-                    print(' ')
-                    for read in edge.reads:
-                        lst.append(read.getStart1());
-                        lst2.append(read.getEnd1());
-                    print(np.mean(lst))
-                    print(np.mean(lst2))
-                    print(' ')
-            contig = contig.next;
+    #     while contig is not None:
+    #         for edge in contig.edges:
+    #             if (first_contig.getName() == edge.getStartContig().getName()):
+    #                 lst = [];
+    #                 lst2 = [];
+    #                 print(first_contig.getName(), edge.sink.getName())
+    #                 print(first_contig.getStart())
+    #                 print(first_contig.getEnd())
+    #                 print('BELOW IS MEAN')
+    #                 print(' ')
+    #                 for read in edge.reads:
+    #                     lst.append(read.getStart1());
+    #                     lst2.append(read.getEnd1());
+    #                 print(np.mean(lst))
+    #                 print(np.mean(lst2))
+    #                 print(' ')
+    #         contig = contig.next;
 
     # #
 
@@ -534,79 +524,35 @@ def switch_contig(contig1, contig2, head, fasta):
 
 def main():
     string = "t3"
+
     tbx_array = get_tbx_array(string);
     fast, test_unit = getFiles(string);
     fasta = pre_process_fasta(fast);
     changes = [];
+
     for entry in tbx_array:
+
         fast, test_unit = getFiles(string);
-        head_contig = Contig.create_ordered_contigs(test_unit);
+        head_contig = Contig.create_contigs(test_unit);
+        contig_array = Contig.create_ordered_contigs(head_contig);
         insert_all_reads(head_contig, entry, fasta);
-        reformat_head(head_contig, changes);
-        fasta, temp = fix_orientation(head_contig, fasta);
+        reformat_head(contig_array, head_contig, changes);
+        fasta, temp = fix_orientation(contig_array, head_contig, fasta);
         changes.extend(temp)
         contig_parts = crossover_detection(head_contig);
 
-        if(len(contig_parts) > 0 ):
+        if(len(contig_parts) > 0):
+
             for contig_part in contig_parts:
                 contig1, contig2 = contig_part[0], contig_part[1];
                 fasta = switch_contig(contig1, contig2, head_contig, fasta);
                 changes.append(contig1.getName() + ',' + contig2.getName());
+                print(contig1.getName() + ',' + contig2.getName());
+
+
 
     print(changes)
     write_fasta(fasta);
-
-# def main():
-#     string = "t6"
-#     tbx_array = get_tbx_array(string);
-#     count = 0;
-#     before_cross = False;
-#     changes_array = [];
-#     fasta_array = [];
-#
-#     old_contig_parts = [];
-#     fast, test_unit = getFiles(string);
-#     new_fast = pre_process_fasta(fast)
-#
-#     for entry in tbx_array:
-#         fasta, test_unit = getFiles(string);
-#         head_contig = Contig.create_contigs(test_unit);
-#         insert_all_reads(head_contig, entry, new_fast);
-#         fasta, changes = fix_orientation(head_contig, new_fast);
-#
-#         contig_parts = crossover_detection(head_contig);
-#
-#         if(len(contig_parts) > 0 or before_cross):
-#             if not before_cross or len(contig_parts) > len(old_contig_parts):
-#                 for contig_part in contig_parts:
-#                     contig1, contig2 = contig_part[0], contig_part[1];
-#                     fasta = switch_contig(contig1, contig2, head_contig, fasta);
-#                     changes.append(contig1.getName() + ',' + contig2.getName());
-#                 before_cross = True;
-#                 old_contig_parts = contig_parts;
-#             else:
-#                 for contig_part in old_contig_parts:
-#                     contig1, contig2 = contig_part[0], contig_part[1];
-#                     contig = head_contig;
-#                     while contig is not None:
-#                         if(contig1.getName() == contig.getName()):
-#                             contig1 = contig;
-#                         elif(contig2.getName() == contig.getName()):
-#                             contig2 = contig;
-#                         contig = contig.next;
-#                     fasta = switch_contig(contig1, contig2, head_contig, fasta);
-#                     changes.append(contig1.getName() + ',' + contig2.getName());
-#
-#
-#         count += 1;
-#         fasta_array.append(fasta)
-#         changes_array.append(changes)
-#         print(changes)
-#
-#     best_index = changes_array.index(max(changes_array, key = lambda x : len(x)));
-#
-#     for i in range(0, len(fasta_array)):
-#         write_fasta(fasta_array[0]);
 
 
 
