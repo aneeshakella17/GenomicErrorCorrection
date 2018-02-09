@@ -121,6 +121,8 @@ def insert_all_reads(head, tbx, fasta, epsilon = 1):
             contig = contig.next;
 
 
+    calc_orientation(head);
+
 
 def fix_orientation(contigs, head_contig, fasta):
     changes = [];
@@ -128,8 +130,8 @@ def fix_orientation(contigs, head_contig, fasta):
     for contig in contigs:
 
         for edge in contig.edges:
-            edge_orientation = edge.getOrientation();
 
+            edge_orientation = edge.getOrientation();
 
             rr = edge_orientation["--"];
             ff = edge_orientation["++"];
@@ -139,15 +141,20 @@ def fix_orientation(contigs, head_contig, fasta):
 
             if(rr > fr or ff > fr):
 
+                main_contig = None;
+
+
                 if(rr > fr):
                     fasta = reverse_compliment(contig, fasta);
                     changes.append(contig.getName());
+                    main_contig = contig;
                 elif(ff > fr):
                     fasta = reverse_compliment(edge.getEndContig(), fasta);
                     changes.append(edge.getEndContig().getName());
+                    main_contig = edge.getEndContig();
 
 
-                position_swap(contigs, head_contig, contig);
+                position_swap(contigs, head_contig, main_contig);
 
 
     return fasta, changes;
@@ -173,6 +180,7 @@ def position_swap(contigs_array, head_contig, contig):
 
 
     for read in contig.reads:
+        
         read.changeOrientation(read.getOrientation()[1], read.getOrientation()[0]);
 
         start = contig.getEnd() - read.getStart1();
@@ -193,8 +201,8 @@ def position_swap(contigs_array, head_contig, contig):
                 for read in edge.reads:
                     if (read.getOrientation()[1] == "+"):
                         read.changeOrientation(read.getOrientation()[0], "-");
-                    else:
-                        read.changeOrientation(read.getOrientation()[0], "+");
+                    # else:
+                            #     read.changeOrientation(read.getOrientation()[0], "+");
 
                     start_distance = contig.getEnd() - read.getStart2();
                     end_distance = contig.getEnd() - read.getEnd2();
@@ -209,8 +217,8 @@ def position_swap(contigs_array, head_contig, contig):
 
             if (read.getOrientation()[0] == "-"):
                 read.changeOrientation("+", read.getOrientation()[1])
-            else:
-                read.changeOrientation("-", read.getOrientation()[1]);
+            # else:
+            #     read.changeOrientation("-", read.getOrientation()[1]);
 
 
             end_distance = contig.getEnd() - read.getStart1();
@@ -329,17 +337,38 @@ def write_fasta(fasta):
             f.write(fasta[i:i+60] + "\n");
 
 
-def crossover_detection(contig):
+def crossover_detection(contigs):
     potential_flips = [];
 
-    while contig is not None:
+    for contig in contigs:
+        found = False;
+
         for edge in contig.edges:
             if(edge.sink.getName() == contig.next.getName()):
-                break;
-            else:
-                potential_flips.append([contig.next, edge.sink]);
-        contig = contig.next;
+                found = True;
 
+        if found:
+            continue;
+
+        for edge in contig.edges:
+            if(edge.sink.getName() != contig.next.getName() and not found):
+                potential_flips.append([contig.next, edge.sink]);
+
+    print(potential_flips)
+
+
+    actual_flips = [];
+
+    for flip in potential_flips:
+        first_contig = flip[0]
+        second_contig = flip[1];
+        print(first_contig.getName(), second_contig.getName())
+        for edge in first_contig.edges:
+            if(edge.getEndContig().getName() == second_contig.getName()):
+                actual_flips.append([first_contig, second_contig]);
+
+
+    return actual_flips;
 
     # for flip in potential_flips:
     #     contig = head;
@@ -442,7 +471,7 @@ def crossover_detection(contig):
     #     z2 = (mean2 - lib_mean)/((lib_std));
     #     print(z1, z2)
 
-    return potential_flips;
+    # return potential_flips;
 
 def switch_contig(contig1, contig2, head, fasta):
 
@@ -523,7 +552,7 @@ def switch_contig(contig1, contig2, head, fasta):
 
 
 def main():
-    string = "t3"
+    string = "t7"
 
     tbx_array = get_tbx_array(string);
     fast, test_unit = getFiles(string);
@@ -538,8 +567,9 @@ def main():
         insert_all_reads(head_contig, entry, fasta);
         reformat_head(contig_array, head_contig, changes);
         fasta, temp = fix_orientation(contig_array, head_contig, fasta);
-        changes.extend(temp)
-        contig_parts = crossover_detection(head_contig);
+        changes.extend(temp);
+        contig_parts = crossover_detection(contig_array)
+        print(contig_parts)
 
         if(len(contig_parts) > 0):
 
