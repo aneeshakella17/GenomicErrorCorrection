@@ -14,7 +14,7 @@ compliment = {'A': 'T', 'C': 'G', 'G': 'C', 'T': 'A', 'N':'N'};
 reverse_dictionary = {'+': '-', '-':'+'}
 
 def get_tbx_array(str):
-    case = {'t1': 'tests/t1/', 't2': 'tests/t2/', 't3': 'tests/t3/', 't4': 'tests/t4/', 't5': 'tests/t5/', 't6': 'tests/t6/', 't7': 'tests/t7/'};
+    case = {'t1': 'tests/t1/', 't2': 'tests/t2/', 't3': 'tests/t3/', 't4': 'tests/t4/', 't5': 'tests/t5/', 't6': 'tests/t6/', 't7': 'tests/t7/', 't8': 'tests/t8/'};
     file_extension = case[str];
     fast = open(file_extension + 'test.fasta');
     test_unit = file_extension + 'test.unit.bed.gz';
@@ -37,7 +37,7 @@ def get_tbx_array(str):
 
 
 def getFiles(str):
-    case = {'t1': 'tests/t1/', 't2': 'tests/t2/', 't3': 'tests/t3/', 't4': 'tests/t4/', 't5': 'tests/t5/', 't6': 'tests/t6/', 't7': 'tests/t7/'};
+    case = {'t1': 'tests/t1/', 't2': 'tests/t2/', 't3': 'tests/t3/', 't4': 'tests/t4/', 't5': 'tests/t5/', 't6': 'tests/t6/', 't7': 'tests/t7/', 't8': 'tests/t8/'};
 
     file_extension = case[str];
 
@@ -125,36 +125,48 @@ def insert_all_reads(head, tbx, fasta, epsilon = 1):
 
 
 def fix_orientation(contigs, head_contig, fasta):
+
     changes = [];
+    contig = head_contig;
 
-    for contig in contigs:
 
+    while contig is not None:
+        # print(contig.getName(), contig.orientation)
         for edge in contig.edges:
+            if(edge.getEndContig().getName() == contig.next.getName()):
 
-            edge_orientation = edge.getOrientation();
+                edge_orientation = edge.getOrientation();
+                rr = edge_orientation["--"];
+                ff = edge_orientation["++"];
+                fr = edge_orientation["+-"]
 
-            rr = edge_orientation["--"];
-            ff = edge_orientation["++"];
-            fr = edge_orientation["+-"]
+                if(rr > fr or ff > fr):
+
+                    main_contig = None;
+
+                    if(rr > fr):
+                        fasta = reverse_compliment(contig, fasta);
+                        changes.append(contig.getName());
+                        main_contig = contig;
+                    elif(ff > fr):
+                        fasta = reverse_compliment(edge.getEndContig(), fasta);
+                        changes.append(edge.getEndContig().getName());
+                        main_contig = edge.getEndContig();
+
+                    position_swap(contigs, head_contig, main_contig);
+
+        contig = contig.next;
 
 
+    contig = head_contig;
 
-            if(rr > fr or ff > fr):
+    while contig is not None:
+        if not contig.getName() in changes:
+            if(contig.getDominantOrientation() == "-+"):
+                position_swap(contigs, head_contig, contig);
+                changes.append(contig.getName())
 
-                main_contig = None;
-
-
-                if(rr > fr):
-                    fasta = reverse_compliment(contig, fasta);
-                    changes.append(contig.getName());
-                    main_contig = contig;
-                elif(ff > fr):
-                    fasta = reverse_compliment(edge.getEndContig(), fasta);
-                    changes.append(edge.getEndContig().getName());
-                    main_contig = edge.getEndContig();
-
-
-                position_swap(contigs, head_contig, main_contig);
+        contig = contig.next;
 
 
     return fasta, changes;
@@ -180,7 +192,7 @@ def position_swap(contigs_array, head_contig, contig):
 
 
     for read in contig.reads:
-        
+
         read.changeOrientation(read.getOrientation()[1], read.getOrientation()[0]);
 
         start = contig.getEnd() - read.getStart1();
@@ -217,8 +229,8 @@ def position_swap(contigs_array, head_contig, contig):
 
             if (read.getOrientation()[0] == "-"):
                 read.changeOrientation("+", read.getOrientation()[1])
-            # else:
-            #     read.changeOrientation("-", read.getOrientation()[1]);
+            else:
+                read.changeOrientation("-", read.getOrientation()[1]);
 
 
             end_distance = contig.getEnd() - read.getStart1();
@@ -369,6 +381,7 @@ def crossover_detection(contigs):
 
 
     return actual_flips;
+
 
     # for flip in potential_flips:
     #     contig = head;
@@ -550,15 +563,74 @@ def switch_contig(contig1, contig2, head, fasta):
 
     return new_fasta;
 
+def create_spacing(heads, fasta):
+
+    means = [];
+
+    for head in heads:
+        lst = [];
+        contig = head;
+        while contig is not None:
+            for read in contig.reads:
+                 lst.append(abs(read.getStart1() - read.getEnd2()));
+            contig = contig.next;
+        uL = np.mean(lst);
+        means.append(uL);
+
+
+    spacings = [];
+
+    while heads.count(None) is not len(heads):
+         g_lst = [];
+         for i in range(0, len(heads)):
+            contig = heads[i];
+            for edge in contig.edges:
+               if(edge.getEndContig().getName() == contig.next.getName()):
+                   first_contig = edge.getStartContig();
+                   second_contig = edge.getEndContig();
+                   for read in edge.reads:
+                       first_dist = abs(read.getStart1() - first_contig.getEnd());
+                       second_dist = abs(second_contig.getStart() - read.getEnd2())
+                       g = means[i] - first_dist - second_dist;
+                       g_lst.append(g);
+
+            heads[i] = heads[i].next;
+
+         if(len(g_lst) != 0):
+             spacings.append(max(np.mean(g_lst), 100));
+         else:
+             spacings.append(100);
+
+
+    spacings = [int(spacing) for spacing in spacings];
+    print(spacings)
+
+    return fasta;
+
+def sum_dict(head_contig):
+    contig = head_contig;
+    dict_array = [];
+    while contig is not None:
+        dict = {"++":0, "+-":0, "--":0, "-+":0};
+        for edge in contig.edges:
+            edge_orientation = edge.getOrientation()
+            dict["+-"] += edge_orientation["+-"];
+            dict["--"] += edge_orientation["--"];
+            dict["++"] += edge_orientation["++"];
+            dict["-+"] += edge_orientation["-+"];
+        dict_array.append(dict);
+        contig = contig.next;
+
+    print(dict_array);
+
 
 def main():
-    string = "t7"
-
+    string = "t8"
     tbx_array = get_tbx_array(string);
     fast, test_unit = getFiles(string);
     fasta = pre_process_fasta(fast);
     changes = [];
-
+    heads = [];
     for entry in tbx_array:
 
         fast, test_unit = getFiles(string);
@@ -568,21 +640,28 @@ def main():
         reformat_head(contig_array, head_contig, changes);
         fasta, temp = fix_orientation(contig_array, head_contig, fasta);
         changes.extend(temp);
-        contig_parts = crossover_detection(contig_array)
-        print(contig_parts)
+        # print(changes)
 
-        if(len(contig_parts) > 0):
+        # contig_parts = crossover_detection(contig_array)
+        #
+        # if(len(contig_parts) > 0):
+        #
+        #     for contig_part in contig_parts:
+        #
+        #         contig1, contig2 = contig_part[0], contig_part[1];
+        #         fasta = switch_contig(contig1, contig2, head_contig, fasta);
+        #         changes.append(contig1.getName() + ',' + contig2.getName());
+        #         print(contig1.getName() + ',' + contig2.getName());
+        #
+        # print(changes);
+        #
+        # heads.append(copy.copy(head_contig));
 
-            for contig_part in contig_parts:
-                contig1, contig2 = contig_part[0], contig_part[1];
-                fasta = switch_contig(contig1, contig2, head_contig, fasta);
-                changes.append(contig1.getName() + ',' + contig2.getName());
-                print(contig1.getName() + ',' + contig2.getName());
-
-
-
-    print(changes)
+    fasta = create_spacing(heads, fasta);
     write_fasta(fasta);
+
+
+
 
 
 
