@@ -9,6 +9,7 @@ import os
 import numpy as np;
 import gevent;
 from pysam import TabixFile
+import operator
 
 compliment = {'A': 'T', 'C': 'G', 'G': 'C', 'T': 'A', 'N':'N'};
 reverse_dictionary = {'+': '-', '-':'+'}
@@ -154,26 +155,32 @@ def fix_orientation(contigs, head_contig, fasta):
             rr = edge_orientation["--"];
             ff = edge_orientation["++"];
             fr = edge_orientation["+-"]
+            rf = edge_orientation["-+"]
 
-            if(rr > fr or ff > fr):
+
+            if(rr > fr or ff > fr or rf > fr):
 
                 main_contig = None;
+                key = findDominantOrientation(edge)
 
-                if(rr > fr and ff < rr ):
-                    fasta = reverse_compliment(contig, fasta);
+                if(key == "--"):
+                    fasta = reverse_compliment(contig, fasta)
+                    print(contig.getName());
                     changes.append(contig.getName());
                     main_contig = contig;
-                elif(ff > fr ):
+                elif(key == "++"):
                     fasta = reverse_compliment(edge.getEndContig(), fasta);
                     changes.append(edge.getEndContig().getName());
                     main_contig = edge.getEndContig();
-                # elif(fr < rf):
-                #     switch_contig(edge.getStartContig(), edge.getEndContig(), head_contig, fasta);
-                #     changes.append(edge.getStartContig().getName());
-                #     changes.append(edge.getEndContig().getName());
-                #
-                #     contig = edge.getEndContig().next;
-
+                elif(key == "-+"):
+                    fasta = reverse_compliment(edge.getStartContig(), fasta);
+                    fasta = reverse_compliment(edge.getEndContig(), fasta);
+                    position_swap(contigs, head_contig, edge.getStartContig());
+                    position_swap(contigs, head_contig, edge.getEndContig());
+                    changes.append(edge.getStartContig().getName());
+                    changes.append(edge.getEndContig().getName());
+                    contig = contig.next;
+                    continue;
 
                 position_swap(contigs, head_contig, main_contig);
 
@@ -200,8 +207,8 @@ def reformat_head(contig_array, head_contig, changes):
         contig = head_contig;
 
         while(contig is not None):
-
             if(contig.getName() == change):
+                print(change)
                 position_swap(contig_array, head_contig, contig);
                 break;
 
@@ -236,7 +243,7 @@ def position_swap(contigs_array, head_contig, contig):
                     if (read.getOrientation()[1] == "+"):
                         read.changeOrientation(read.getOrientation()[0], "-");
                     # else:
-                            #     read.changeOrientation(read.getOrientation()[0], "+");
+                    #         read.changeOrientation(read.getOrientation()[0], "+");
 
                     start_distance = contig.getEnd() - read.getStart2();
                     end_distance = contig.getEnd() - read.getEnd2();
@@ -246,13 +253,11 @@ def position_swap(contigs_array, head_contig, contig):
 
 
     for edge in contig.edges:
-
         for read in edge.reads:
-
             if (read.getOrientation()[0] == "-"):
                 read.changeOrientation("+", read.getOrientation()[1])
-            else:
-                read.changeOrientation("-", read.getOrientation()[1]);
+            # else:
+            #     read.changeOrientation("-", read.getOrientation()[1]);
 
 
             end_distance = contig.getEnd() - read.getStart1();
@@ -628,7 +633,7 @@ def create_spacing(heads, fasta):
 
     return fasta;
 
-def sum_dict(head_contig):
+def sum_dict(head_contig, default = 20):
     contig = head_contig;
     dict_array = [];
     best_edge = None;
@@ -644,7 +649,13 @@ def sum_dict(head_contig):
             best_sum = sum;
             best_edge = edge;
 
-    return best_edge;
+    if(best_sum >= default):
+        return best_edge;
+    else:
+        return None;
+
+def findDominantOrientation(edge):
+    return max(edge.orientation.items(), key=operator.itemgetter(1))[0]
 
 def main():
     string = "t8"
@@ -662,6 +673,8 @@ def main():
         fasta, temp = fix_orientation(contig_array, head_contig, fasta);
         changes.extend(temp);
         print(changes)
+
+
         # contig_parts = crossover_detection(contig_array)
         #
         # if(len(contig_parts) > 0):
@@ -676,7 +689,6 @@ def main():
         # print(changes);
         #
         # heads.append(copy.copy(head_contig));
-        break;
 
     fasta = create_spacing(heads, fasta);
     write_fasta(fasta);
