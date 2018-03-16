@@ -13,6 +13,8 @@ import operator
 
 compliment = {'A': 'T', 'C': 'G', 'G': 'C', 'T': 'A', 'N':'N'};
 reverse_dictionary = {'+': '-', '-':'+'}
+edge_dict = {};
+
 
 def get_tbx_array(str):
     case = {'t1': 'tests/t1/', 't2': 'tests/t2/', 't3': 'tests/t3/', 't4': 'tests/t4/', 't5': 'tests/t5/', 't6': 'tests/t6/', 't7': 'tests/t7/', 't8': 'tests/t8/'};
@@ -140,52 +142,49 @@ def fix_orientation(contigs, head_contig, fasta):
 
     while contig is not None:
 
-        # for edge in contig.edges:
-        #
-        #     if(edge.getEndContig().getName() == contig.next.getName()):
+        for edge in contig.edges:
 
-            edge = sum_dict(contig);
+            if(edge.getEndContig().getName() == contig.next.getName()):
 
-            if(edge is None):
-                contig = contig.next;
-                continue;
 
-            edge_orientation = edge.getOrientation();
-            print(edge.getStartContig().getName(), edge.getEndContig().getName(), edge_orientation)
-            rr = edge_orientation["--"];
-            ff = edge_orientation["++"];
-            fr = edge_orientation["+-"]
-            rf = edge_orientation["-+"]
+                edge_orientation = edge.getOrientation();
+                print(edge.getStartContig().getName(), edge.getEndContig().getName(), edge_orientation)
+
+                fr = edge_orientation["+-"]
+
+                if(sum_edge(edge) is False):
+                    break;
 
 
             # if(rr > fr or ff > fr or rf > fr):
 
-            main_contig = None;
-            key = findDominantOrientation(edge)
+                main_contig = None;
+                key = findDominantOrientation(edge)
 
-            if(key == "--"):
-                fasta = reverse_compliment(contig, fasta)
-                print(contig.getName());
-                changes.append(contig.getName());
-                main_contig = contig;
-            elif(key == "++"):
-                fasta = reverse_compliment(edge.getEndContig(), fasta);
-                changes.append(edge.getEndContig().getName());
-                main_contig = edge.getEndContig();
-            elif(key == "-+" and fr == 0):
-                fasta = reverse_compliment(edge.getStartContig(), fasta);
-                fasta = reverse_compliment(edge.getEndContig(), fasta);
-                position_swap(contigs, head_contig, edge.getStartContig());
-                position_swap(contigs, head_contig, edge.getEndContig());
-                changes.append(edge.getStartContig().getName());
-                changes.append(edge.getEndContig().getName());
-                contig = contig.next;
-                continue;
+                if(key == "--"):
+                    fasta = reverse_compliment(contig, fasta)
+                    changes.append(contig.getName());
+                    main_contig = contig;
+                elif(key == "++"):
+                    fasta = reverse_compliment(edge.getEndContig(), fasta);
+                    changes.append(edge.getEndContig().getName());
+                    main_contig = edge.getEndContig();
+                elif(key == "-+" and fr == 0):
+                    fasta = reverse_compliment(edge.getStartContig(), fasta);
+                    position_swap(contigs, head_contig, edge.getStartContig());
+                    fasta = reverse_compliment(edge.getEndContig(), fasta);
+                    position_swap(contigs, head_contig, edge.getEndContig());
+                    changes.append(edge.getStartContig().getName());
+                    changes.append(edge.getEndContig().getName());
+                    contig = contig.next;
+                    break;
 
-            if(main_contig is not None):
-                position_swap(contigs, head_contig, main_contig);
+                if(main_contig is not None):
+                    position_swap(contigs, head_contig, main_contig);
 
-            contig = contig.next;
+                break;
+
+        contig = contig.next;
 
 
     # contig = head_contig;
@@ -301,7 +300,7 @@ def reverse_compliment(contig, fasta):
     start = contig.start;
     end = contig.end;
 
-    reversed_seq = fasta[start:end + 1][::-1];
+    reversed_seq = fasta[start:end][::-1];
     compliment_seq = '';
 
     for i in range(0, len(reversed_seq)):
@@ -309,7 +308,7 @@ def reverse_compliment(contig, fasta):
         new_char = compliment[char]
         compliment_seq += new_char;
 
-    fasta = fasta[0:start] + compliment_seq + fasta[end + 1:];
+    fasta = fasta[0:start] + compliment_seq + fasta[end:];
     return fasta;
 
 
@@ -633,38 +632,39 @@ def create_spacing(heads, fasta):
 
     return fasta;
 
-def sum_dict(head_contig, default = 0):
-    contig = head_contig;
-    dict_array = [];
-    best_edge = None;
-    best_sum = 0;
-    for edge in contig.edges:
-        sum = 0;
-        edge_orientation = edge.getOrientation()
-        sum += edge_orientation["+-"];
-        sum += edge_orientation["--"];
-        sum += edge_orientation["++"];
-        sum += edge_orientation["-+"];
-        if(sum >= best_sum):
-            best_sum = sum;
-            best_edge = edge;
 
-    if(best_sum >= default):
-        return best_edge;
+def sum_edge(edge, default = 10):
+    sum = 0;
+    edge_orientation = edge.getOrientation()
+    sum += edge_orientation["+-"];
+    sum += edge_orientation["--"];
+    sum += edge_orientation["++"];
+    sum += edge_orientation["-+"];
+
+    str = edge.getStartContig().getName() + edge.getEndContig().getName()
+    if(edge_dict.get(str) is None):
+        edge_dict[str] = findDominantOrientation(edge);
+    elif(edge_dict[str] == findDominantOrientation(edge)):
+        key = findDominantOrientation(edge);
+        if(key == "++" or key == "--" or key == "-+"):
+            return True;
+
+    if(sum <= default):
+        return False;
     else:
-        return None;
+        return True;
 
 def findDominantOrientation(edge):
     return max(edge.orientation.items(), key=operator.itemgetter(1))[0]
 
 def main():
-    string = "t5"
+    string = "t8"
     tbx_array = get_tbx_array(string);
     fast, test_unit = getFiles(string);
     fasta = pre_process_fasta(fast);
     changes = [];
     heads = [];
-    for entry in reversed(tbx_array):
+    for entry in tbx_array:
         fast, test_unit = getFiles(string);
         head_contig = Contig.create_contigs(test_unit);
         contig_array = Contig.create_ordered_contigs(head_contig);
@@ -689,9 +689,15 @@ def main():
         #
         # heads.append(copy.copy(head_contig));
 
+
+
+
+
     fasta = create_spacing(heads, fasta);
     write_fasta(fasta);
-
+    os.system("nucmer --prefix check truth5.fasta output.fasta");
+    os.system("delta-filter -1 check.delta >check.1.delta")
+    os.system("mummerplot --png check.1.delta")
 
 
 
