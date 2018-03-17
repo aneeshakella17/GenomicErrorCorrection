@@ -140,23 +140,20 @@ def fix_orientation(contigs, head_contig, fasta):
 
     contig = head_contig;
 
-    while contig is not None:
-
+    for contig in contigs:
         for edge in contig.edges:
 
             if(edge.getEndContig().getName() == contig.next.getName()):
 
 
-                edge_orientation = edge.getOrientation();
-                print(edge.getStartContig().getName(), edge.getEndContig().getName(), edge_orientation)
 
+                edge_orientation = edge.getOrientation();
+
+                print(edge.getStartContig().getName(), edge.getEndContig().getName(), edge_orientation);
                 fr = edge_orientation["+-"]
 
                 if(sum_edge(edge) is False):
                     break;
-
-
-            # if(rr > fr or ff > fr or rf > fr):
 
                 main_contig = None;
                 key = findDominantOrientation(edge)
@@ -170,19 +167,11 @@ def fix_orientation(contigs, head_contig, fasta):
                     changes.append(edge.getEndContig().getName());
                     main_contig = edge.getEndContig();
                 elif(key == "-+" and fr == 0):
-                    fasta = reverse_compliment(edge.getStartContig(), fasta);
-                    position_swap(contigs, head_contig, edge.getStartContig());
-                    fasta = reverse_compliment(edge.getEndContig(), fasta);
-                    position_swap(contigs, head_contig, edge.getEndContig());
-                    changes.append(edge.getStartContig().getName());
-                    changes.append(edge.getEndContig().getName());
-                    contig = contig.next;
-                    break;
+
 
                 if(main_contig is not None):
                     position_swap(contigs, head_contig, main_contig);
 
-                break;
 
         contig = contig.next;
 
@@ -299,7 +288,6 @@ def switch_orientation(seq1, seq2):
 def reverse_compliment(contig, fasta):
     start = contig.start;
     end = contig.end;
-
     reversed_seq = fasta[start:end][::-1];
     compliment_seq = '';
 
@@ -309,6 +297,7 @@ def reverse_compliment(contig, fasta):
         compliment_seq += new_char;
 
     fasta = fasta[0:start] + compliment_seq + fasta[end:];
+
     return fasta;
 
 
@@ -672,7 +661,6 @@ def main():
         reformat_head(contig_array, head_contig, changes);
         fasta, temp = fix_orientation(contig_array, head_contig, fasta);
         changes.extend(temp);
-        print(changes)
 
         # contig_parts = crossover_detection(contig_array)
         #
@@ -685,13 +673,10 @@ def main():
         #         changes.append(contig1.getName() + ',' + contig2.getName());
         #         print(contig1.getName() + ',' + contig2.getName());
         #
-        # print(changes);
         #
         # heads.append(copy.copy(head_contig));
-
-
-
-
+        #
+        # print(changes)
 
     fasta = create_spacing(heads, fasta);
     write_fasta(fasta);
