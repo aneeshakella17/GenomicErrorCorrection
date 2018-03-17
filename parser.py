@@ -61,7 +61,6 @@ def pre_process_fasta(fast):
 
 def insert_all_reads(head, tbx, fasta, epsilon = 1):
     contig = head;
-
     total_rows = [];
 
 
@@ -96,7 +95,6 @@ def insert_all_reads(head, tbx, fasta, epsilon = 1):
         fourth_position = int(new_row[5]);
 
         contig = head;
-        firstSet = False;
         first_contig = None;
 
         while contig is not None:
@@ -108,7 +106,8 @@ def insert_all_reads(head, tbx, fasta, epsilon = 1):
                 first_contig = contig;
             elif(contig.getStart() < third_position and contig.getEnd() > fourth_position and first_contig is not None):
                 edge_found = False;
-                for edge in first_contig.edges:
+
+                for edge in first_contig.forward_edges:
                     if edge.getEndContig().getName() == contig.getName():
                         new_read = Read(first_contig, contig, new_row);
                         edge.addRead(new_read);
@@ -119,73 +118,68 @@ def insert_all_reads(head, tbx, fasta, epsilon = 1):
                     edge = Edge(first_contig, contig);
                     new_read = Read(first_contig, contig, new_row);
                     edge.addRead(new_read);
-                    first_contig.add_edge(edge);
+                    first_contig.add_forward_edge(edge);
+                    contig.add_back_edge(edge);
 
             contig = contig.next;
 
 
     calc_orientation(head);
-
+    filter(head);
 
 def fix_orientation(contigs, head_contig, fasta):
 
     changes = [];
 
-    # contig = head_contig;
-    # while contig is not None:
-    #     for edge in contig.edges:
-    #         if(edge.getEndContig().getName() == contig.next.getName()):
-    #             print(edge.getStartContig().getName(), edge.getEndContig().getName(), edge.orientation)
-    #     contig = contig.next;
-
-    contig = head_contig;
-
     for contig in contigs:
-        for edge in contig.edges:
+        print(contig.getName());
+        print(' ')
 
-            if(edge.getEndContig().getName() == contig.next.getName()):
+        print('FORWARD')
+        for edge in contig.forward_edges:
 
+            edge_orientation = edge.getOrientation();
+            print(edge.getStartContig().getName(), edge.getEndContig().getName(), edge_orientation)
 
+            ff = edge_orientation["++"];
+            fr = edge_orientation["+-"];
 
-                edge_orientation = edge.getOrientation();
+            if(ff > fr):
 
-                print(edge.getStartContig().getName(), edge.getEndContig().getName(), edge_orientation);
-                fr = edge_orientation["+-"]
+                endContig = edge.getEndContig();
 
-                if(sum_edge(edge) is False):
-                    break;
+                ff_majority = ([findDominantOrientation(edge) for edge in endContig.forward_edges]).count("--");
+                rr_majority = ([findDominantOrientation(edge) for edge in endContig.back_edges]).count("++");
 
-                main_contig = None;
-                key = findDominantOrientation(edge)
+                frac = (ff_majority + rr_majority)/ (len(endContig.forward_edges) + len(endContig.back_edges))
+                print(frac)
+                if frac >= 0.5:
+                    fasta = reverse_compliment(endContig, fasta);
+                    changes.append(endContig.getName());
+                    position_swap(contigs, head_contig, endContig);
 
-                if(key == "--"):
-                    fasta = reverse_compliment(contig, fasta)
-                    changes.append(contig.getName());
-                    main_contig = contig;
-                elif(key == "++"):
-                    fasta = reverse_compliment(edge.getEndContig(), fasta);
-                    changes.append(edge.getEndContig().getName());
-                    main_contig = edge.getEndContig();
-                elif(key == "-+" and fr == 0):
+        print('REVERSE')
+        for edge in contig.back_edges:
 
+            edge_orientation = edge.getOrientation();
+            print(edge.getStartContig().getName(), edge.getEndContig().getName(), edge_orientation)
+            rr = edge_orientation["--"];
+            fr = edge_orientation["+-"];
 
-                if(main_contig is not None):
-                    position_swap(contigs, head_contig, main_contig);
+            if(rr > fr):
 
+                startContig = edge.getStartContig();
 
-        contig = contig.next;
+                ff_majority = ([findDominantOrientation(edge) for edge in startContig.forward_edges]).count("--");
+                rr_majority = ([findDominantOrientation(edge) for edge in startContig.back_edges]).count("++");
+                frac = (ff_majority + rr_majority)/(len(startContig.forward_edges) + len(startContig.back_edges));
+                print(frac)
+                if frac >= 0.5:
+                    fasta = reverse_compliment(startContig, fasta);
+                    changes.append(startContig.getName());
+                    position_swap(contigs, head_contig, startContig);
 
-
-    # contig = head_contig;
-
-    # while contig is not None:
-    #     if not contig.getName() in changes:
-    #         if(contig.getDominantOrientation() == "-+"):
-    #             position_swap(contigs, head_contig, contig);
-    #             changes.append(contig.getName())
-    #
-    #     contig = contig.next;
-
+        print(' ')
 
     return fasta, changes;
 
@@ -224,29 +218,26 @@ def position_swap(contigs_array, head_contig, contig):
 
 
 
-    for tmp in contigs_array:
-        for edge in tmp.edges:
-            if (edge.getEndContig().getName() == contig.getName()):
-                for read in edge.reads:
-                    if (read.getOrientation()[1] == "+"):
-                        read.changeOrientation(read.getOrientation()[0], "-");
-                    # else:
-                    #         read.changeOrientation(read.getOrientation()[0], "+");
+    for edge in contig.back_edges:
+        for read in edge.reads:
+            if (read.getOrientation()[1] == "+"):
+                    read.changeOrientation(read.getOrientation()[0], "-");
+            # else:
+                #read.changeOrientation(read.getOrientation()[0], "+");
 
-                    start_distance = contig.getEnd() - read.getStart2();
-                    end_distance = contig.getEnd() - read.getEnd2();
-                    read.changeStart2Seq(contig.getStart() + start_distance)
-                    read.changeEnd2Seq(contig.getStart() + end_distance)
+            start_distance = contig.getEnd() - read.getStart2();
+            end_distance = contig.getEnd() - read.getEnd2();
+            read.changeStart2Seq(contig.getStart() + start_distance)
+            read.changeEnd2Seq(contig.getStart() + end_distance)
 
 
 
-    for edge in contig.edges:
+    for edge in contig.forward_edges:
         for read in edge.reads:
             if (read.getOrientation()[0] == "-"):
                 read.changeOrientation("+", read.getOrientation()[1])
             # else:
             #     read.changeOrientation("-", read.getOrientation()[1]);
-
 
             end_distance = contig.getEnd() - read.getStart1();
             start_distance = contig.getEnd() - read.getEnd1();
@@ -305,7 +296,7 @@ def reset_orientation(head):
     contig = head;
     while contig is not None:
         contig.orientation['++'], contig.orientation['--'], contig.orientation['-+'], contig.orientation['+-'] = 0, 0, 0, 0;
-        for edge in contig.edges:
+        for edge in contig.forward_edges:
             edge.orientation['++'], edge.orientation['--'], edge.orientation['-+'], edge.orientation[
                 '+-'] = 0, 0, 0, 0;
         contig = contig.next;
@@ -330,7 +321,7 @@ def calc_orientation(head):
                 contig.orientation[new_position] += 1;
 
 
-        for edge in contig.edges:
+        for edge in contig.forward_edges:
             for read in edge.reads:
                 edge.increment(read.getOrientation());
 
@@ -622,7 +613,7 @@ def create_spacing(heads, fasta):
     return fasta;
 
 
-def sum_edge(edge, default = 10):
+def sum_edge(edge, default = 15):
     sum = 0;
     edge_orientation = edge.getOrientation()
     sum += edge_orientation["+-"];
@@ -646,13 +637,34 @@ def sum_edge(edge, default = 10):
 def findDominantOrientation(edge):
     return max(edge.orientation.items(), key=operator.itemgetter(1))[0]
 
+def mode(arr):
+    dict = {"++":0 , "+-":0, "--":0, "-+": 0};
+    if(len(arr) == 0):
+        return None;
+    for elem in arr: dict[elem] += 1;
+    return max(dict.items(), key=operator.itemgetter(1))[0]
+
+def filter(head_contig, default = 6):
+    contig = head_contig;
+    while contig is not None:
+
+
+        contig.forward_edges = [edge for edge in contig.forward_edges if (edge.orientation["++"] + edge.orientation["+-"] + edge.orientation["--"] + edge.orientation["-+"]) > default];
+        contig.back_edges = [edge for edge in contig.back_edges if (edge.orientation["++"] + edge.orientation["+-"] + edge.orientation["--"] + edge.orientation["-+"]) > default];
+
+
+
+        contig = contig.next;
+
+
 def main():
-    string = "t8"
+    string = "t5"
     tbx_array = get_tbx_array(string);
     fast, test_unit = getFiles(string);
     fasta = pre_process_fasta(fast);
     changes = [];
     heads = [];
+
     for entry in tbx_array:
         fast, test_unit = getFiles(string);
         head_contig = Contig.create_contigs(test_unit);
@@ -660,8 +672,8 @@ def main():
         insert_all_reads(head_contig, entry, fasta);
         reformat_head(contig_array, head_contig, changes);
         fasta, temp = fix_orientation(contig_array, head_contig, fasta);
-        changes.extend(temp);
-
+        changes.extend(temp)
+        print(changes)
         # contig_parts = crossover_detection(contig_array)
         #
         # if(len(contig_parts) > 0):
@@ -677,6 +689,7 @@ def main():
         # heads.append(copy.copy(head_contig));
         #
         # print(changes)
+
 
     fasta = create_spacing(heads, fasta);
     write_fasta(fasta);
