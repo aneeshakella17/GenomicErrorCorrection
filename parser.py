@@ -131,55 +131,61 @@ def fix_orientation(contigs, head_contig, fasta):
 
     changes = [];
 
-    for contig in contigs:
-        print(contig.getName());
-        print(' ')
+    # contig = head_contig;
+    # while contig is not None:
+    #     frac = sum_edges(contig);
+    #     print(contig.getName(), frac);
+    #
+    #     for edge in contig.back_edges:
+    #         print(edge.getStartContig().getName(), edge.getEndContig().getName(), edge.orientation);
+    #
+    #     for edge in contig.forward_edges:
+    #         print(edge.getStartContig().getName(), edge.getEndContig().getName(), edge.orientation);
+    #
+    #     contig = contig.next;
 
-        print('FORWARD')
+
+    for contig in contigs:
+
+
+        #Look at the forward edges
         for edge in contig.forward_edges:
 
             edge_orientation = edge.getOrientation();
-            print(edge.getStartContig().getName(), edge.getEndContig().getName(), edge_orientation)
-
             ff = edge_orientation["++"];
             fr = edge_orientation["+-"];
 
             if(ff > fr):
-
                 endContig = edge.getEndContig();
-
-                ff_majority = ([findDominantOrientation(edge) for edge in endContig.forward_edges]).count("--");
-                rr_majority = ([findDominantOrientation(edge) for edge in endContig.back_edges]).count("++");
-
-                frac = (ff_majority + rr_majority)/ (len(endContig.forward_edges) + len(endContig.back_edges))
-                print(frac)
-                if frac >= 0.5:
+                frac = sum_edges(endContig);
+                if frac < 0:
                     fasta = reverse_compliment(endContig, fasta);
                     changes.append(endContig.getName());
                     position_swap(contigs, head_contig, endContig);
 
-        print('REVERSE')
+        #Look at the backward edges
         for edge in contig.back_edges:
 
             edge_orientation = edge.getOrientation();
-            print(edge.getStartContig().getName(), edge.getEndContig().getName(), edge_orientation)
             rr = edge_orientation["--"];
             fr = edge_orientation["+-"];
 
             if(rr > fr):
-
                 startContig = edge.getStartContig();
+                frac= sum_edges(startContig);
 
-                ff_majority = ([findDominantOrientation(edge) for edge in startContig.forward_edges]).count("--");
-                rr_majority = ([findDominantOrientation(edge) for edge in startContig.back_edges]).count("++");
-                frac = (ff_majority + rr_majority)/(len(startContig.forward_edges) + len(startContig.back_edges));
-                print(frac)
-                if frac >= 0.5:
-                    fasta = reverse_compliment(startContig, fasta);
-                    changes.append(startContig.getName());
-                    position_swap(contigs, head_contig, startContig);
-
-        print(' ')
+    # contig = head_contig;
+    # while contig is not None:
+    #     frac = sum_edges(contig);
+    #     print(contig.getName(), frac);
+    #
+    #     for edge in contig.back_edges:
+    #         print(edge.getStartContig().getName(), edge.getEndContig().getName(), edge.orientation);
+    #
+    #     for edge in contig.forward_edges:
+    #         print(edge.getStartContig().getName(), edge.getEndContig().getName(), edge.orientation);
+    #
+    #     contig = contig.next;
 
     return fasta, changes;
 
@@ -613,27 +619,6 @@ def create_spacing(heads, fasta):
     return fasta;
 
 
-def sum_edge(edge, default = 15):
-    sum = 0;
-    edge_orientation = edge.getOrientation()
-    sum += edge_orientation["+-"];
-    sum += edge_orientation["--"];
-    sum += edge_orientation["++"];
-    sum += edge_orientation["-+"];
-
-    str = edge.getStartContig().getName() + edge.getEndContig().getName()
-    if(edge_dict.get(str) is None):
-        edge_dict[str] = findDominantOrientation(edge);
-    elif(edge_dict[str] == findDominantOrientation(edge)):
-        key = findDominantOrientation(edge);
-        if(key == "++" or key == "--" or key == "-+"):
-            return True;
-
-    if(sum <= default):
-        return False;
-    else:
-        return True;
-
 def findDominantOrientation(edge):
     return max(edge.orientation.items(), key=operator.itemgetter(1))[0]
 
@@ -644,11 +629,9 @@ def mode(arr):
     for elem in arr: dict[elem] += 1;
     return max(dict.items(), key=operator.itemgetter(1))[0]
 
-def filter(head_contig, default = 6):
+def filter(head_contig, default = 0):
     contig = head_contig;
     while contig is not None:
-
-
         contig.forward_edges = [edge for edge in contig.forward_edges if (edge.orientation["++"] + edge.orientation["+-"] + edge.orientation["--"] + edge.orientation["-+"]) > default];
         contig.back_edges = [edge for edge in contig.back_edges if (edge.orientation["++"] + edge.orientation["+-"] + edge.orientation["--"] + edge.orientation["-+"]) > default];
 
@@ -656,9 +639,63 @@ def filter(head_contig, default = 6):
 
         contig = contig.next;
 
+def sum_edges(contig):
+    fr = 0;
+    ff = 0;
+    rr = 0;
+
+    new_ff = 0;
+    new_rr = 0;
+    new_fr = 0;
+
+    for edge in contig.back_edges:
+        fr += edge.orientation["+-"];
+        ff += edge.orientation["++"];
+
+        new_ff += edge.orientation["++"]
+        new_rr += edge.orientation["--"]
+        new_fr += edge.orientation["+-"]
+
+
+    for edge in contig.forward_edges:
+        fr += edge.orientation["+-"];
+        rr += edge.orientation["--"];
+        new_ff += edge.orientation["++"]
+        new_rr += edge.orientation["--"]
+        new_fr += edge.orientation["+-"]
+
+
+    return fr - ff - rr;
+
+
+def check_flip(contig, fasta):
+    fr1 = 0;
+    fr2 = 0;
+
+    for edge in contig.back_edges:
+        fr1 += edge.orientation["+-"]
+
+    for edge in contig.forward_edges:
+        fr1 += edge.orientation["+-"]
+
+    reverse_compliment(contig, fasta);
+
+    for edge in contig.back_edges:
+        fr2 += edge.orientation["+-"]
+
+    for edge in contig.forward_edges:
+        fr2 += edge.orientation["+-"]
+
+    reverse_compliment(contig, fasta);
+
+    if (fr2 > fr1):
+        return True;
+    else:
+        return False;
+
 
 def main():
-    string = "t5"
+    string = "t8"
     tbx_array = get_tbx_array(string);
     fast, test_unit = getFiles(string);
     fasta = pre_process_fasta(fast);
@@ -689,6 +726,8 @@ def main():
         # heads.append(copy.copy(head_contig));
         #
         # print(changes)
+        break
+
 
 
     fasta = create_spacing(heads, fasta);
